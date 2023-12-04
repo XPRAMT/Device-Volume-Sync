@@ -1,4 +1,4 @@
-# Device-Volume-Sync
+# Device Volume Sync
 可以將所有聲音裝置的音量與預設聲音裝置同步<br>
 建議與voicemeeter搭配使用
 
