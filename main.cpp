@@ -32,11 +32,15 @@ public:
             float volume = pNotify->fMasterVolume;
             BOOL isMuted = pNotify->bMuted;
 
+            if (volume < 0.01) {
+                isMuted = 1;
+            }
+
             if (per_isMuted != isMuted) {
                 SyncNonDefaultDevicesToDefault(isMuted, volume,1);
                 if (isMuted == 1) {cout << "Muted" << endl;}else{cout << "UnMute" << endl; }
             }
-            if (per_volume != volume) {
+            if (per_volume != volume && volume>=0.01 ) {
                 SyncNonDefaultDevicesToDefault(isMuted,volume,2);
                 cout << "volume:" << volume * 100 << "%" << endl;
             }
