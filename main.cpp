@@ -1,10 +1,12 @@
-﻿#include <windows.h>
+#include <windows.h>
 #include <shellapi.h>
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
 #include <iostream>
 using namespace std;
 
+BOOL per_isMuted;
+float per_volume;
 class MyAudioEndpointVolumeCallback : public IAudioEndpointVolumeCallback {
 public:
     // 增加參考計數
@@ -29,17 +31,22 @@ public:
             // 在此處處理音量變更通知
             float volume = pNotify->fMasterVolume;
             BOOL isMuted = pNotify->bMuted;
-            if (isMuted == 0) {
-                cout << "volume:" << volume << endl;
-            } else{
-                cout << "Muted"<< endl;
+
+            if (per_isMuted != isMuted) {
+                SyncNonDefaultDevicesToDefault(isMuted, volume,1);
+                if (isMuted == 1) {cout << "Muted" << endl;}else{cout << "UnMute" << endl; }
             }
-            SyncNonDefaultDevicesToDefault(volume, isMuted);
+            if (per_volume != volume) {
+                SyncNonDefaultDevicesToDefault(isMuted,volume,2);
+                cout << "volume:" << volume * 100 << "%" << endl;
+            }
+            per_isMuted = isMuted;
+            per_volume = volume;
         }
         return S_OK;
     }
 
-    void SyncNonDefaultDevicesToDefault(float volume, BOOL isMuted) {
+ void SyncNonDefaultDevicesToDefault(BOOL isMuted,float volume,int state) {
         HRESULT hr;
         IMMDeviceEnumerator* deviceEnumerator = NULL;
         IMMDevice* defaultDevice = NULL;
@@ -59,22 +66,26 @@ public:
         UINT deviceCount = 0;
         hr = deviceCollection->GetCount(&deviceCount);
 
-        for (UINT i = 0; i < deviceCount-1; i++) {
+        for (UINT i = 0; i < deviceCount; i++) {
             IMMDevice* currentDevice = NULL;
             hr = deviceCollection->Item(i, &currentDevice);
-            
             if (currentDevice) {
                 IAudioEndpointVolume* currentEndpointVolume = NULL;
 
                 // 啟用當前端點音量界面
-                hr = currentDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER,
-                    NULL, (LPVOID*)&currentEndpointVolume);
+                hr = currentDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER,NULL, (LPVOID*)&currentEndpointVolume);
 
                 // 將指定的音量值應用到非默認設備
                 if (currentEndpointVolume) {
                     // 將指定的聲音狀態應用到非默認設備
-                    hr = currentEndpointVolume->SetMasterVolumeLevelScalar(volume, NULL);
-                    hr = currentEndpointVolume->SetMute(isMuted, NULL);
+                    switch (state) {
+                    case 1:
+                        hr = currentEndpointVolume->SetMute(isMuted, NULL);
+                        break;
+                    case 2:
+                        hr = currentEndpointVolume->SetMasterVolumeLevelScalar(volume, NULL);
+                        break;
+                    }
                     currentEndpointVolume->Release();
                 }
             }
@@ -91,6 +102,7 @@ public:
     }
 };
 
+
 int main() {
 
     HRESULT hr;
@@ -101,17 +113,14 @@ int main() {
 
     // 初始化 COM Library
     hr = CoInitialize(NULL);
-
     // 創建設備枚舉器
     hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER,
         __uuidof(IMMDeviceEnumerator), (LPVOID*)&deviceEnumerator);
 
     // 獲取默認音訊端點
      hr = deviceEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice);
-
     // 啟用默認端點音量界面
-    hr = defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER,
-        NULL, (LPVOID*)&defaultEndpointVolume);
+    hr = defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER,NULL, (LPVOID*)&defaultEndpointVolume);
 
     // 註冊音量變更通知的回呼介面
     hr = defaultEndpointVolume->RegisterControlChangeNotify(endpointVolumeCallback);
