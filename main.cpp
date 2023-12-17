@@ -237,24 +237,27 @@ public:
             // 在此處處理音量變更通知
             float volume = pNotify->fMasterVolume;
             BOOL isMuted = pNotify->bMuted;
-
+            //如果音量小於1%則設為靜音
             if (volume < 0.01)
             {
                 isMuted = 1;
             }
-
+            //取到小數點後兩位
+            volume = roundf(volume * 100) / 100;
+            //如果靜音狀態改變
             if (per_isMuted != isMuted)
             {
                 SyncNonDefaultDevicesToDefault(isMuted, volume, 1);
                 if (isMuted == 1)
                 {
-                    cout << "Muted" << endl;
+                    cout  << "Muted" << endl;
                 }
                 else
                 {
                     cout << "UnMute" << endl;
                 }
             }
+            //如果音量狀態改變
             if (per_volume != volume && volume >= 0.01)
             {
                 SyncNonDefaultDevicesToDefault(isMuted, volume, 2);
@@ -343,8 +346,9 @@ int main()
 
     // Start the listener
     listener.Start();
-
     cout << "Start" << endl;
+    // 隱藏窗口
+    ShowWindow(GetConsoleWindow(), SW_HIDE);
     while (true)
     {
         HRESULT hr;
@@ -367,15 +371,12 @@ int main()
         // 註冊音量變更通知的回呼介面
         hr = defaultEndpointVolume->RegisterControlChangeNotify(endpointVolumeCallback);
 
-        // 隱藏窗口
-        ShowWindow(GetConsoleWindow(), SW_HIDE);
-
         // 保持執行
         while (reLoad)
         {
             Sleep(500); // （根據需要調整延遲時間）
         }
-        cout << "Default audio device changed" << endl;
+        cout <<"Default audio device changed" << endl;
         reLoad=1;
         // 取消註冊預設設備的回呼介面
         hr = defaultEndpointVolume->UnregisterControlChangeNotify(endpointVolumeCallback);
