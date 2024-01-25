@@ -1,4 +1,4 @@
-#include <windows.h>
+﻿#include <windows.h>
 #include <shellapi.h>
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
@@ -7,6 +7,7 @@ using namespace std;
 
 BOOL per_isMuted;
 BOOL reLoad=1;
+BOOL isOpen = true;
 float per_volume;
 ////////////////////////////////////////////////////////
 class NotificationClient : public IMMNotificationClient
@@ -249,13 +250,9 @@ public:
             {
                 SyncNonDefaultDevicesToDefault(isMuted, volume, 1);
                 if (isMuted == 1)
-                {
-                    cout  << "Muted" << endl;
-                }
+                {cout  << "Muted" << endl;}
                 else
-                {
-                    cout << "UnMute" << endl;
-                }
+                {cout << "UnMute" << endl;}
             }
             //如果音量狀態改變
             if (per_volume != volume && volume >= 0.01)
@@ -302,8 +299,9 @@ public:
                 hr = currentDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID *)&currentEndpointVolume);
 
                 // 將指定的音量值應用到非默認設備
-                if (currentEndpointVolume)
+                if (currentEndpointVolume && isOpen)
                 {
+                    isOpen = false;
                     // 將指定的聲音狀態應用到非默認設備
                     switch (state)
                     {
@@ -315,6 +313,7 @@ public:
                         break;
                     }
                     currentEndpointVolume->Release();
+                    isOpen = true;
                 }
             }
             if (currentDevice)
