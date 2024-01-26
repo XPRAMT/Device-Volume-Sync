@@ -7,7 +7,6 @@ using namespace std;
 
 BOOL per_isMuted;
 BOOL reLoad=1;
-BOOL isOpen = true;
 float per_volume;
 ////////////////////////////////////////////////////////
 class NotificationClient : public IMMNotificationClient
@@ -240,33 +239,28 @@ public:
             BOOL isMuted = pNotify->bMuted;
             //如果音量小於1%則設為靜音
             if (volume < 0.01)
-            {
-                isMuted = 1;
-            }
+            { isMuted = 1;}
             //取到小數點後兩位
             volume = roundf(volume * 100) / 100;
             //如果靜音狀態改變
             if (per_isMuted != isMuted)
             {
-                SyncNonDefaultDevicesToDefault(isMuted, volume, 1);
                 if (isMuted == 1)
-                {cout  << "Muted" << endl;}
+                {cout  << "Muted                   " << '\r';}
                 else
-                {cout << "UnMute" << endl;}
+                {cout << "UnMute                 " << '\r';}
             }
-            //如果音量狀態改變
-            if (per_volume != volume && volume >= 0.01)
+            if  (per_volume != volume && volume >= 0.01) //如果音量狀態改變
             {
-                SyncNonDefaultDevicesToDefault(isMuted, volume, 2);
-                cout << "volume:" << volume * 100 << "%" << endl;
+                cout << "volume:" << volume * 100 << "%                    " << '\r';
+                    
             }
-            per_isMuted = isMuted;
-            per_volume = volume;
+            SyncNonDefaultDevicesToDefault(isMuted, volume);
         }
         return S_OK;
     }
 
-    void SyncNonDefaultDevicesToDefault(BOOL isMuted, float volume, int state)
+    void SyncNonDefaultDevicesToDefault(BOOL isMuted, float volume)
     {
         HRESULT hr;
         IMMDeviceEnumerator *deviceEnumerator = NULL;
@@ -279,6 +273,11 @@ public:
         // 創建設備枚舉器
         hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER,
                               __uuidof(IMMDeviceEnumerator), (LPVOID *)&deviceEnumerator);
+        // 取得預設音訊渲染設備
+        hr = deviceEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice);
+        //取得設備的唯一識別符 (GUID)
+        LPWSTR defaultDeviceId = NULL;
+        hr = defaultDevice->GetId(&defaultDeviceId);
 
         IMMDeviceCollection *deviceCollection = NULL;
         // 枚舉音訊端點
@@ -293,33 +292,27 @@ public:
             hr = deviceCollection->Item(i, &currentDevice);
             if (currentDevice)
             {
-                IAudioEndpointVolume *currentEndpointVolume = NULL;
-
-                // 啟用當前端點音量界面
-                hr = currentDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID *)&currentEndpointVolume);
-
-                // 將指定的音量值應用到非默認設備
-                if (currentEndpointVolume && isOpen)
+                //取得設備的唯一識別符 (GUID)
+                LPWSTR DeviceId = NULL;
+                hr = currentDevice->GetId(&DeviceId);
+                if(wstring(DeviceId) != wstring(defaultDeviceId)) //如果不是預設裝置
                 {
-                    isOpen = false;
-                    // 將指定的聲音狀態應用到非默認設備
-                    switch (state)
+                    IAudioEndpointVolume *currentEndpointVolume = NULL;
+                    // 啟用當前端點音量界面
+                    hr = currentDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (LPVOID *)&currentEndpointVolume);
+                    // 將指定的音量值應用到非默認設備
+                    if (currentEndpointVolume)
                     {
-                    case 1:
+                        //調整靜音狀態
                         hr = currentEndpointVolume->SetMute(isMuted, NULL);
-                        break;
-                    case 2:
+                        //調整靜音狀態,音量
                         hr = currentEndpointVolume->SetMasterVolumeLevelScalar(volume, NULL);
-                        break;
+                        currentEndpointVolume->Release();
                     }
-                    currentEndpointVolume->Release();
-                    isOpen = true;
                 }
             }
-            if (currentDevice)
-                currentDevice->Release();
+            currentDevice->Release();
         }
-
         if (defaultEndpointVolume)
             defaultEndpointVolume->Release();
         if (defaultDevice)
@@ -345,9 +338,9 @@ int main()
 
     // Start the listener
     listener.Start();
-    cout << "Start" << endl;
+    cout << "Running" << endl;
     // 隱藏窗口
-    ShowWindow(GetConsoleWindow(), SW_HIDE);
+    //ShowWindow(GetConsoleWindow(), SW_HIDE);
     while (true)
     {
         HRESULT hr;
@@ -375,7 +368,7 @@ int main()
         {
             Sleep(500); // （根據需要調整延遲時間）
         }
-        cout <<"Default audio device changed" << endl;
+        cout <<"Default audio device changed" << '\r';
         reLoad=1;
         // 取消註冊預設設備的回呼介面
         hr = defaultEndpointVolume->UnregisterControlChangeNotify(endpointVolumeCallback);
